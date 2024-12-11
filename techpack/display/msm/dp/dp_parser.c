@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  */
 
@@ -178,8 +178,7 @@ static int dp_parser_misc(struct dp_parser *parser)
 				&parser->pixel_base_off[i]);
 	}
 
-	parser->display_type = of_get_property(of_node, "qcom,display-type",
-					NULL);
+	parser->display_type = of_get_property(of_node, "qcom,display-type", NULL);
 	if (!parser->display_type)
 		parser->display_type = "unknown";
 
@@ -187,8 +186,6 @@ static int dp_parser_misc(struct dp_parser *parser)
 			"qcom,panel-notifier-support");
 	DP_DEBUG("panel-notifier-support = %d\n", parser->panel_notifier_support);
 
-	parser->ext_hpd_en = of_property_read_bool(of_node,
-			"qcom,dp-ext-hpd");
 	return 0;
 }
 
