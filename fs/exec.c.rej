@@ -1,12 +1,21 @@
-diff a/fs/exec.c b/fs/exec.c	(rejected hunks)
-@@ -66,6 +66,10 @@
- #include <linux/io_uring.h>
+--- fs/exec.c
++++ fs/exec.c
+@@ -1897,6 +1908,18 @@ static int do_execveat_common(int fd, struct filename *filename,
+ 	if (IS_ERR(filename))
+ 		return PTR_ERR(filename);
  
- #include <linux/uaccess.h>
 +#ifdef CONFIG_KSU_SUSFS_SUS_SU
-+#include <linux/susfs_def.h>
++	if (likely(susfs_is_current_proc_umounted())) {
++		goto orig_flow;
++	}
++	if (likely(susfs_is_sus_su_hooks_enabled) &&
++		unlikely(__ksu_is_allow_uid(current_uid().val)))
++	{
++		ksu_handle_execveat_sucompat(&fd, &filename, &argv, &envp, &flags);
++	}
++orig_flow:
 +#endif
 +
- #include <asm/mmu_context.h>
- #include <asm/tlb.h>
- 
+ 	/*
+ 	 * We move the actual failure in case of RLIMIT_NPROC excess from
+ 	 * set*uid() to execve() because too many poorly written programs
