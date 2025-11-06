@@ -1,4 +1,5 @@
-diff a/fs/open.c b/fs/open.c	(rejected hunks)
+--- fs/open.c
++++ fs/open.c
 @@ -32,6 +32,9 @@
  #include <linux/ima.h>
  #include <linux/dnotify.h>
@@ -28,7 +29,7 @@ diff a/fs/open.c b/fs/open.c	(rejected hunks)
  	const struct cred *old_cred = NULL;
  
 +#ifdef CONFIG_KSU_SUSFS_SUS_SU
-+	if (likely(susfs_is_current_proc_su_not_allowed())) {
++	if (likely(susfs_is_current_proc_umounted())) {
 +		goto orig_flow;
 +	}
 +	if (likely(susfs_is_sus_su_hooks_enabled) &&
