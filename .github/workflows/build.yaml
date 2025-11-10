@@ -1,0 +1,82 @@
+name: Build AnyKernel3 and publish release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (lord-nethunter-dev, shallow, submodules shallow)
+        uses: actions/checkout@v4
+        with:
+          ref: lord-nethunter-dev
+          fetch-depth: 1
+          submodules: false
+
+      - name: Init submodules at depth 1 (recursive)
+        run: |
+          git submodule update --init --recursive --depth 1 || true
+
+      - name: Download and extract Clang into parent dir
+        working-directory: ${{ github.workspace }}
+        run: |
+          OUTDIR="$(realpath ../)"
+          wget -q -O "$OUTDIR/clang.tar.gz" \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
+          mkdir -p "$OUTDIR/clang-r547379"
+          tar -xzf "$OUTDIR/clang.tar.gz" -C "$OUTDIR/clang-r547379"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libncurses5-dev libssl-dev ccache wget unzip zip python3 python3-pip
+
+      - name: Determine ZIPPREFIX
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          TAG=$(git describe --tags --exact-match 2>/dev/null || true)
+          if [ -n "$TAG" ]; then
+            echo "ZIPPREFIX=$TAG" >> $GITHUB_ENV
+          else
+            echo "ZIPPREFIX=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+          fi
+
+      - name: Build AnyKernel3
+        working-directory: src/Anykernel3
+        env:
+          BUILD: "1"
+          ANYKERNEL: "1"
+          ZIPPREFIX: ${{ env.ZIPPREFIX }}
+        run: |
+          ./build.sh
+
+      - name: Locate zip artifact
+        run: |
+          ARTIFACT=$(find src/Anykernel3 -maxdepth 2 -type f -name '*.zip' | head -n1)
+          echo "ARTIFACT=$ARTIFACT" >> $GITHUB_ENV
+          echo "ART_NAME=$(basename "$ARTIFACT")" >> $GITHUB_ENV
+
+      - id: create_release
+        name: Create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.ZIPPREFIX }}
+          release_name: Release ${{ env.ZIPPREFIX }}
+          body: Automated AnyKernel3 build
+          draft: false
+          prerelease: false
+
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.ARTIFACT }}
+          asset_name: ${{ env.ART_NAME }}
+          asset_content_type: application/zip
