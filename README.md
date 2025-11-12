@@ -19,6 +19,7 @@ This kernel is for advanced users. I am not responsible if your device turns int
 
 1. Flash the anykernel zip via TWRP
 1. Before flashing, please backup boot, vendor_boot, dtbo & super. You can restore them back later to return to the original state
+2. Things not working? Make a github issue or use the discussions feature
 
 # Related
 
