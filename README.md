@@ -4,6 +4,8 @@ Based on https://github.com/Spanish-or-Vanish/kernel_xiaomi_sm8350
 
 Devices supported: Xiaomi 11t Pro (vili)
 
+Development branch: lord-dev @ https://github.com/loystonpais/android_kernel_qcom_sm8350/tree/lord-dev
+
 # Warning ⚠️
 
 This kernel is for advanced users. I am not responsible if your device turns into a nuclear reactor.
