@@ -1,14 +1,15 @@
 # Lord Kernel
 
+<img width="300" alt="Screenshot_20251115-193653_NetHunter Terminal" src="https://github.com/user-attachments/assets/0bd84eea-ee69-45df-af0a-d36b8569ec37" />
+<img width="300" alt="Screenshot_20251115-193701_KernelSU Next" src="https://github.com/user-attachments/assets/499a1111-359a-42d0-8d1e-ac146f460fb8" />
+<img width="300" alt="Screenshot_20251115-193733_Settings" src="https://github.com/user-attachments/assets/a3a6aa11-f0cc-43b9-90d7-538d0edd2c12" />
+
+
 Based on https://github.com/Spanish-or-Vanish/kernel_xiaomi_sm8350
 
 Devices supported: Xiaomi 11t Pro (vili)
 
 Development branch: lord-dev @ https://github.com/loystonpais/android_kernel_qcom_sm8350/tree/lord-dev
-
-# Warning ⚠️
-
-This kernel is for advanced users. I am not responsible if your device turns into a nuclear reactor.
 
 # Features
 
@@ -16,6 +17,11 @@ This kernel is for advanced users. I am not responsible if your device turns int
 1. Nethunter Patches
 1. Several kernel features enabled to support docker
 1. Btrfs, ntfs and exfat are supported
+
+
+# Warning ⚠️
+
+This kernel is for advanced users.
 
 # Notes
 
