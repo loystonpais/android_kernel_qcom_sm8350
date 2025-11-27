@@ -1,9 +1,15 @@
 # Lord Kernel
 
+A customized android kernel for SM8350 SoC
+
 <img width="300" alt="Screenshot_20251115-193653_NetHunter Terminal" src="https://github.com/user-attachments/assets/0bd84eea-ee69-45df-af0a-d36b8569ec37" />
 <img width="300" alt="Screenshot_20251115-193701_KernelSU Next" src="https://github.com/user-attachments/assets/499a1111-359a-42d0-8d1e-ac146f460fb8" />
 <img width="300" alt="Screenshot_20251115-193733_Settings" src="https://github.com/user-attachments/assets/a3a6aa11-f0cc-43b9-90d7-538d0edd2c12" />
 
+### Working of tp-link ac600 (rtl8832au) adapter
+<img width="500" alt="screenshot" src="https://github.com/user-attachments/assets/4929436d-f379-4ec5-87a5-fbdaba54f791" />
+
+</br>
 
 Based on https://github.com/Spanish-or-Vanish/kernel_xiaomi_sm8350
 
@@ -15,6 +21,7 @@ Development branch: lord-dev @ https://github.com/loystonpais/android_kernel_qco
 
 1. KernelSU Next + susfs
 1. Nethunter Patches
+1. External WiFi adapter support for pentesting (RTL8821AU) 
 1. Several kernel features enabled to support docker
 1. Btrfs, ntfs and exfat are supported
 
