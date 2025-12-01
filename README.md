@@ -25,19 +25,25 @@ Development branch: lord-dev @ https://github.com/loystonpais/android_kernel_qco
 1. Several kernel features enabled to support docker
 1. Btrfs, ntfs and exfat are supported
 
-
 # Warning ⚠️
 
 This kernel is for advanced users.
 
-# Notes
+# Usage
 
-1. Flash the anykernel zip via TWRP
-1. Before flashing, please backup boot, vendor_boot, dtbo & super. You can restore them back later to return to the original state
-2. Things not working? Make a github issue or use the discussions feature
+> Before flashing, please backup boot, vendor_boot, dtbo & super. You can restore them back later to return to the original state
+
+> Disable HIDE SUS MOUNTS FOR ALL PROCESSES if you are using susfs (fixes issues with chroot mounting)
+
+1. Flash the anykernel zip in releases via TWRP
+1. Flash rtw88 firmware magisk module from the given link below
+1. Flash nethuter module from link given below
+1. Things not working? Make a github issue or use the discussions feature
 
 # Related
 
+https://github.com/loystonpais/rtw88/releases - RTW88 Firmware magiks module
+
 https://github.com/SherlockChiang/Nethunter_for_KernelSU - Nethunter module for kernelsu. It's recommended that you update the rootfs.
 
-https://github.com/sidex15/susfs4ksu-module/issues/86 - Fix for nethunter chroot mount issues. You need to run `su -c ksu_susfs hide_sus_mnts_for_all_procs 0` before mounting.
+https://github.com/sidex15/susfs4ksu-module/issues/86 - Alternative fix for nethunter chroot mount issues. Basically you need to run `su -c ksu_susfs hide_sus_mnts_for_all_procs 0` before mounting.
