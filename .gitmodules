@@ -6,3 +6,6 @@
 	path = AnyKernel3
 	url = https://github.com/loystonpais/AnyKernel3
 	branch = lord-old-ak
+[submodule "drivers/net/wireless/realtek/rtw88"]
+	path = drivers/net/wireless/realtek/rtw88
+	url = https://github.com/loystonpais/rtw88
