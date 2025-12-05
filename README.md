@@ -47,3 +47,9 @@ https://github.com/loystonpais/rtw88/releases - RTW88 Firmware magiks module
 https://github.com/SherlockChiang/Nethunter_for_KernelSU - Nethunter module for kernelsu. It's recommended that you update the rootfs.
 
 https://github.com/sidex15/susfs4ksu-module/issues/86 - Alternative fix for nethunter chroot mount issues. Basically you need to run `su -c ksu_susfs hide_sus_mnts_for_all_procs 0` before mounting.
+
+# Dev Notes
+
+### 5-12-2025
+- backup lord-dev 
+- lord-dev rebased to vili_ksu-300 from susu-300
