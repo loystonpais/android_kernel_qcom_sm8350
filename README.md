@@ -33,6 +33,8 @@ This kernel is for advanced users.
 
 > Before flashing, please backup boot, vendor_boot, dtbo & super. You can restore them back later to return to the original state
 
+> Flash latest firmware !!!
+
 > Disable HIDE SUS MOUNTS FOR ALL PROCESSES if you are using susfs (fixes issues with chroot mounting)
 
 1. Flash the anykernel zip in releases via TWRP
@@ -42,7 +44,7 @@ This kernel is for advanced users.
 
 # Related
 
-https://github.com/loystonpais/rtw88/releases - RTW88 Firmware magiks module
+https://github.com/loystonpais/rtw88/releases - RTW88 Firmware magisk module
 
 https://github.com/SherlockChiang/Nethunter_for_KernelSU - Nethunter module for kernelsu. It's recommended that you update the rootfs.
 
