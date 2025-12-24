@@ -55,3 +55,7 @@ https://github.com/sidex15/susfs4ksu-module/issues/86 - Alternative fix for neth
 ### 5-12-2025
 - backup lord-dev 
 - lord-dev rebased to vili_ksu-300 from susu-300
+
+### 16-12-25
+- backup lord-dev
+- lord-dev rebased to vili_ksu-302 from vili_ksu-300
