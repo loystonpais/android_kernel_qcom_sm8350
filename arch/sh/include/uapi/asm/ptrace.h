@@ -17,6 +17,9 @@
 #define PTRACE_GETFDPIC_EXEC	0	/* [addr] request the executable loadmap */
 #define PTRACE_GETFDPIC_INTERP	1	/* [addr] request the interpreter loadmap */
 
+#define PTRACE_EVENTMSG_SYSCALL_ENTRY	1
+#define PTRACE_EVENTMSG_SYSCALL_EXIT	2
+
 #define	PTRACE_GETDSPREGS	55	/* DSP registers */
 #define	PTRACE_SETDSPREGS	56
 
