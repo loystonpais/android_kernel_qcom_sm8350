@@ -7,7 +7,7 @@ A customized android kernel for SM8350 SoC
 <img width="300" alt="Screenshot_20251115-193733_Settings" src="https://github.com/user-attachments/assets/a3a6aa11-f0cc-43b9-90d7-538d0edd2c12" />
 
 ### Working of tp-link ac600 (rtl8821au) adapter
-<img width="500" alt="screenshot" src="https://github.com/user-attachments/assets/4929436d-f379-4ec5-87a5-fbdaba54f791" />
+<img width="500"  alt="lord-dev-testing-low-res" src="https://github.com/user-attachments/assets/3166cbb5-3677-40ce-ba70-3f115f5071bf" />
 
 </br>
 
