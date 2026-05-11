@@ -30,6 +30,8 @@
 #include <linux/init.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#include <linux/cred.h>
+#include <linux/uidgid.h>
 #include "osif_sync.h"
 #include <wlan_hdd_includes.h>
 #include <net/arp.h>
@@ -155,6 +157,11 @@
 #include "os_if_nan.h"
 #include "wlan_hdd_apf.h"
 #include "wlan_hdd_cfr.h"
+#ifdef FEATURE_FRAME_INJECTION_SUPPORT
+#include "wlan_hdd_frame_inject.h"
+#include "wma_frame_inject.h"
+#endif
+#include <qdf_hang_event_notifier.h>
 #include "wlan_hdd_ioctl.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "hif.h"
@@ -7148,6 +7155,26 @@ nla_put_failure:
 	 (((data_snr_weight) & 0xff) << 8) | \
 	 ((ack_snr_weight) & 0xff))
 
+#define ANT_DIV_SET_PROBE_THRESHOLD(wlan_probe_thre, bt_probe_thre) \
+	((1 << 30) | \
+	 (((wlan_probe_thre) & 0x1fff) << 13) | \
+	 ((bt_probe_thre) & 0x1fff))
+
+#define ANT_DIV_SET_PROBE_CNT(wlan_probe_cnt, bt_probe_cnt) \
+	((1 << 31) | \
+	 (((wlan_probe_cnt) & 0x1fff) << 13) | \
+	 ((bt_probe_cnt) & 0x1fff))
+
+#define ANT_DIV_SET_RSSI_DIFF(wlan_rssi_diff, bt_rssi_diff) \
+	((1 << 27) | \
+	 (((wlan_rssi_diff) & 0x1fff) << 13) | \
+	 ((bt_rssi_diff) & 0x1fff))
+
+#define ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD
+#define ANT_DIV_PROBE_BT_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_BT_RSSI_THRESHOLD
+
 #define RX_REORDER_TIMEOUT_VOICE \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_VOICE
 #define RX_REORDER_TIMEOUT_VIDEO \
@@ -7221,6 +7248,18 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ACK_SNR_WEIGHT] = {
 		.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_WLAN] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_BT] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_BT_RSSI_THRESHOLD] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_WLAN_RSSI_DIFF] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_BT_RSSI_DIFF] = {
+		.type = NLA_U16},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RESTRICT_OFFCHANNEL] = {.type = NLA_U8},
 	[RX_REORDER_TIMEOUT_VOICE] = {.type = NLA_U32},
 	[RX_REORDER_TIMEOUT_VIDEO] = {.type = NLA_U32},
@@ -8127,6 +8166,110 @@ static int hdd_config_ant_div_snr_weight(struct hdd_adapter *adapter,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set ant div weight, %d", errno);
+
+	return errno;
+}
+
+static int hdd_config_ant_probe_count(struct hdd_adapter *adapter,
+				      struct nlattr *tb[])
+{
+	struct nlattr *wlan_cnt_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_WLAN];
+	struct nlattr *bt_cnt_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_BT];
+	uint16_t wlan_cnt, bt_cnt;
+	uint32_t ant_probe_cnt;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_cnt_attr && !bt_cnt_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_cnt_attr || !bt_cnt_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_cnt_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_cnt = nla_get_u16(wlan_cnt_attr);
+	bt_cnt = nla_get_u16(bt_cnt_attr);
+	ant_probe_cnt = ANT_DIV_SET_PROBE_CNT(wlan_cnt, bt_cnt);
+	hdd_debug("ant probe count: %x", ant_probe_cnt);
+	errno = wma_cli_set_command(adapter->vdev_id,
+				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    ant_probe_cnt, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant probe count, %d", errno);
+
+	return errno;
+}
+
+static int hdd_config_ant_probe_threshold(struct hdd_adapter *adapter,
+					  struct nlattr *tb[])
+{
+	struct nlattr *wlan_thre_attr = tb[ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD];
+	struct nlattr *bt_thre_attr = tb[ANT_DIV_PROBE_BT_RSSI_THRESHOLD];
+	uint16_t wlan_threshold, bt_threshold;
+	uint32_t ant_probe_threshold;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_thre_attr && !bt_thre_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_thre_attr || !bt_thre_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_thre_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_threshold = nla_get_u16(wlan_thre_attr);
+	bt_threshold = nla_get_u16(bt_thre_attr);
+	ant_probe_threshold = ANT_DIV_SET_PROBE_THRESHOLD(wlan_threshold,
+							  bt_threshold);
+	hdd_debug("ant probe threshold: %x", ant_probe_threshold);
+	errno = wma_cli_set_command(adapter->vdev_id,
+				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    ant_probe_threshold, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant probe threshold, %d", errno);
+
+	return errno;
+}
+
+static int hdd_config_ant_div_switch_rssi_diff(struct hdd_adapter *adapter,
+						struct nlattr *tb[])
+{
+	struct nlattr *wlan_rssi_diff_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_WLAN_RSSI_DIFF];
+	struct nlattr *bt_rssi_diff_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_BT_RSSI_DIFF];
+	uint16_t wlan_rssi_diff, bt_rssi_diff;
+	uint32_t ant_rssi_diff;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_rssi_diff_attr && !bt_rssi_diff_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_rssi_diff_attr || !bt_rssi_diff_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_rssi_diff_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_rssi_diff = nla_get_u16(wlan_rssi_diff_attr);
+	bt_rssi_diff = nla_get_u16(bt_rssi_diff_attr);
+	ant_rssi_diff = ANT_DIV_SET_RSSI_DIFF(wlan_rssi_diff, bt_rssi_diff);
+	hdd_debug("ant rssi diff: %x", ant_rssi_diff);
+	errno = wma_cli_set_command(adapter->vdev_id,
+				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    ant_rssi_diff, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant rssi diff, %d", errno);
 
 	return errno;
 }
@@ -9970,6 +10113,9 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_mpdu_aggregation,
 	hdd_config_ant_div_period,
 	hdd_config_ant_div_snr_weight,
+	hdd_config_ant_probe_count,
+	hdd_config_ant_probe_threshold,
+	hdd_config_ant_div_switch_rssi_diff,
 	wlan_hdd_cfg80211_wifi_set_reorder_timeout,
 	wlan_hdd_cfg80211_wifi_set_rx_blocksize,
 	hdd_config_msdu_aggregation,
@@ -16832,9 +16978,13 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_DISA_VENDOR_COMMANDS
 	FEATURE_TDLS_VENDOR_COMMANDS
 	FEATURE_SAR_LIMITS_VENDOR_COMMANDS
-	BCN_RECV_FEATURE_VENDOR_COMMANDS
 	FEATURE_VENDOR_SUBCMD_SET_TRACE_LEVEL
-
+#ifdef FEATURE_FRAME_INJECTION_SUPPORT
+	FEATURE_FRAME_INJECTION_VENDOR_COMMANDS,
+#endif
+#ifdef WLAN_BCN_RECV_FEATURE
+	BCN_RECV_FEATURE_VENDOR_COMMANDS,
+#endif
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
 		.info.subcmd =
@@ -18320,6 +18470,53 @@ static bool hdd_is_ap_mode(enum QDF_OPMODE mode)
 }
 
 /**
+ * request_hw_sync() - Request hardware mode update
+ * @new_mode: New QDF mode (STA or MONITOR)
+ * This function sets the new value of con_mode and schedules an
+ * asynchronous worker to apply the configuration to the hardware.
+ */
+#define CON_MODE_STA		0
+#define CON_MODE_MONITOR	4
+
+static atomic_t hw_sync_scheduled = ATOMIC_INIT(0);
+static void do_hw_sync_work(struct work_struct *work);
+static DECLARE_WORK(monitor_work, do_hw_sync_work);
+
+static inline void request_hw_sync(enum QDF_OPMODE new_mode)
+{
+	int new_val = (new_mode == QDF_MONITOR_MODE) ?
+			CON_MODE_MONITOR : CON_MODE_STA;
+
+	WRITE_ONCE(con_mode, new_val);
+
+	if (atomic_xchg(&hw_sync_scheduled, 1) == 0)
+		queue_work(system_unbound_wq, &monitor_work);
+}
+
+static void do_hw_sync_work(struct work_struct *work)
+{
+	struct kernel_param kp = {
+		.name = "con_mode",
+		.ops  = &con_mode_ops,
+		.arg  = &con_mode,
+	};
+	char mode_str[16];
+	int val;
+
+	val = READ_ONCE(con_mode);
+	snprintf(mode_str, sizeof(mode_str), "%d", val);
+	pr_info("WLAN: Syncing HW to con_mode '%s'\n", mode_str);
+
+	if (con_mode_ops.set)
+		con_mode_ops.set(mode_str, &kp);
+	else
+		pr_warn("WLAN: con_mode_ops.set is NULL\n");
+
+	if (atomic_xchg(&hw_sync_scheduled, 0) == 1)
+		queue_work(system_unbound_wq, &monitor_work);
+}
+
+/**
  * __wlan_hdd_cfg80211_change_iface() - change interface cfg80211 op
  * @wiphy: Pointer to the wiphy structure
  * @ndev: Pointer to the net device
@@ -18389,6 +18586,31 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 		if (hdd_max_sta_vdev_count_reached(adapter->hdd_ctx))
 			return -EINVAL;
 	}
+	if (adapter->device_mode == QDF_MONITOR_MODE &&
+	    new_mode == QDF_MONITOR_MODE) {
+		ndev->ieee80211_ptr->iftype = type;
+		hdd_exit();
+		return 0;
+	}
+
+	/*
+	 * Android framework daemons can race monitor mode by forcing station
+	 * iftype transitions right after monitor enable. Reject non-root
+	 * monitor->non-monitor requests while monitor global mode is active.
+	 *
+	 * Return an error instead of success so cfg80211 doesn't WARN on
+	 * iftype mismatch (it expects iftype to match @type when callback
+	 * returns success).
+	 */
+	if ((adapter->device_mode == QDF_MONITOR_MODE ||
+	     hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) &&
+	    new_mode != QDF_MONITOR_MODE &&
+	    !uid_eq(current_euid(), GLOBAL_ROOT_UID)) {
+		hdd_warn_rl("rejecting monitor->%s iface change from %s",
+			    qdf_opmode_str(new_mode), current->comm);
+		hdd_exit();
+		return -EOPNOTSUPP;
+	}
 
 	errno = hdd_trigger_psoc_idle_restart(hdd_ctx);
 	if (errno) {
@@ -18431,7 +18653,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 				 * a randomized MAC address of the
 				 * form 02:1A:11:Fx:xx:xx
 				 */
-				get_random_bytes(&ndev->dev_addr[3], 3);
+				get_random_bytes((void *)&ndev->dev_addr[3], 3);
 				ndev->dev_addr[0] = 0x02;
 				ndev->dev_addr[1] = 0x1A;
 				ndev->dev_addr[2] = 0x11;
@@ -18487,6 +18709,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	ndev->ieee80211_ptr->iftype = type;
 	hdd_lpass_notify_mode_change(adapter);
+	request_hw_sync(new_mode);
 err:
 	/* Set bitmask based on updated value */
 	policy_mgr_set_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);
@@ -24841,9 +25064,23 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	/* Verify the BW before accepting this request */
 	ch_width = hdd_map_nl_chan_width(chandef->width);
 
-	if (ch_width > CH_WIDTH_10MHZ ||
-	   (!cds_is_sub_20_mhz_enabled() && ch_width > CH_WIDTH_160MHZ)) {
-		hdd_err("invalid BW received %d", ch_width);
+	switch (ch_width) {
+	case CH_WIDTH_5MHZ:
+	case CH_WIDTH_10MHZ:
+		if (!cds_is_sub_20_mhz_enabled()) {
+			hdd_err("Sub-20MHz not supported, but got BW %d", ch_width);
+			return -EINVAL;
+		}
+		break;
+
+	case CH_WIDTH_20MHZ:
+	case CH_WIDTH_40MHZ:
+	case CH_WIDTH_80MHZ:
+	case CH_WIDTH_160MHZ:
+		break;
+
+	default:
+		hdd_err("Unsupported channel width received: %d", ch_width);
 		return -EINVAL;
 	}
 
@@ -24882,11 +25119,23 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
 					     chandef->chan->center_freq,
 					     sec_ch_2g_freq, &ch_params);
-	if (wlan_hdd_change_hw_mode_for_given_chnl(adapter,
+
+	/*
+	 * Skip HW mode change if not required, to avoid unnecessary
+	 * MCC/SCC/DBS transitions. This helps in cases where monitor
+	 * mode is started on a channel that is already active on
+	 * another interface.
+	 */
+	if (policy_mgr_is_hw_mode_change_required_for_channel_switch(
+		hdd_ctx->psoc, adapter->vdev_id,
+		chandef->chan->center_freq,
+		POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
+		if (wlan_hdd_change_hw_mode_for_given_chnl(adapter,
 						   chandef->chan->center_freq,
 						   POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN)) {
-		hdd_err("Failed to change hw mode");
-		return -EINVAL;
+			hdd_err("Failed to change hw mode");
+			return -EINVAL;
+		}
 	}
 
 	if (adapter->monitor_mode_vdev_up_in_progress) {
@@ -24934,6 +25183,26 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 		adapter->monitor_mode_vdev_up_in_progress = false;
 		return qdf_status_to_os_return(status);
 	}
+
+	adapter->mon_chan_freq = chandef->chan->center_freq;
+	adapter->mon_bandwidth = ch_width;
+
+#ifdef FEATURE_FRAME_INJECTION_SUPPORT
+	/*
+	 * Proactively re-tune the injection helper STA vdev to the new
+	 * monitor channel.  Without this, injected frames would briefly
+	 * go out on the old frequency until the next injection attempt
+	 * detects the mismatch and triggers a lazy re-tune.
+	 */
+	{
+		tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+		if (wma)
+			wma_injection_notify_channel_change(
+				wma, adapter->vdev_id,
+				chandef->chan->center_freq);
+	}
+#endif
 
 	hdd_exit();
 
@@ -25879,20 +26148,77 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 }
 
 /**
- * wlan_hdd_cfg80211_get_channel() - API to process cfg80211 get_channel request
+ * Station, SAP, etc - wlan_hdd_cfg80211_get_channel() - API to process cfg80211 get_channel request
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to wireless device
  * @chandef: Pointer to channel definition
  *
  * Return: 0 for success, non zero for failure
+ *
+ * Monitor - wlan_hdd_cfg80211_get_channel() - Report current operating channel
+ * @wiphy: wiphy handle
+ * @wdev: wireless_dev handle
+ * @chandef: output channel definition
+ *
+ * Required by nl80211 (NL80211_CMD_GET_INTERFACE) and wext (SIOCGIWFREQ)
+ * so that tools like aireplay-ng / mdk3 can determine the current channel.
+ *
+ * Return: 0 on success, -ENODATA if no channel is set.
  */
 static int wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
 					 struct cfg80211_chan_def *chandef)
 {
-	int errno;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_mon_set_ch_info *ch_info;
+	struct ieee80211_channel *chan;
 	struct osif_vdev_sync *vdev_sync;
+	uint32_t freq;
+	int errno;
 
+	if (!adapter)
+		return -ENODATA;
+
+	/* -------- LOGIC FOR MONITOR MODE --------- */
+	if (adapter->device_mode == QDF_MONITOR_MODE) {
+		/* Primary source: mon_chan_freq */
+		freq = adapter->mon_chan_freq;
+
+		/* Fallback: station context ch_info */
+		if (!freq) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			ch_info = &sta_ctx->ch_info;
+			freq = ch_info->freq;
+		}
+
+		if (!freq)
+			return -ENODATA;
+
+		chan = ieee80211_get_channel(wiphy, freq);
+		if (!chan)
+			return -ENODATA;
+
+		cfg80211_chandef_create(chandef, chan, NL80211_CHAN_NO_HT);
+
+		/* Upgrade width if we know the bandwidth */
+		switch (adapter->mon_bandwidth) {
+		case CH_WIDTH_40MHZ:
+			chandef->width = NL80211_CHAN_WIDTH_40;
+			break;
+		case CH_WIDTH_80MHZ:
+			chandef->width = NL80211_CHAN_WIDTH_80;
+			break;
+		case CH_WIDTH_160MHZ:
+			chandef->width = NL80211_CHAN_WIDTH_160;
+			break;
+		default:
+			break;
+		}
+		return 0;
+	}
+
+	/* --- LOGIC FOR NORMAL MODES (Station, SAP, etc.) --- */
 	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;
