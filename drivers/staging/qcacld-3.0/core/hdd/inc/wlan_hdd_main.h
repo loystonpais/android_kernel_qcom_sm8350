@@ -98,6 +98,9 @@
 #include "wlan_hdd_oemdata.h"
 #endif
 #include "wlan_hdd_he.h"
+#ifdef FEATURE_FRAME_INJECTION_SUPPORT
+#include "wlan_hdd_frame_inject.h"
+#endif
 
 #include <net/neighbour.h>
 #include <net/netevent.h>
@@ -246,6 +249,7 @@ enum hdd_adapter_flags {
 	WMM_INIT_DONE,
 	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,
+	DEVICE_IFACE_FROZEN,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 };
@@ -1293,6 +1297,8 @@ struct hdd_adapter {
 	bool disconnection_in_progress;
 	qdf_mutex_t disconnection_status_lock;
 	unsigned long event_flags;
+	struct work_struct defrost_work;
+	qdf_atomic_t defrost_scheduled;
 
 	/**Device TX/RX statistics*/
 	struct net_device_stats stats;
@@ -1568,6 +1574,9 @@ struct hdd_adapter {
 	qdf_atomic_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
 #ifdef WLAN_FEATURE_PKT_CAPTURE
 	struct hdd_adapter *mon_adapter;
+#endif
+#ifdef FEATURE_FRAME_INJECTION_SUPPORT
+	struct hdd_injection_ctx *injection_ctx;
 #endif
 };
 
@@ -4915,8 +4924,15 @@ static inline void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 
 #ifdef FEATURE_WLAN_RESIDENT_DRIVER
 extern char *country_code;
+#endif
+/**
+ * Global access to con_mode and its ops
+ * moved out of FEATURE_WLAN_RESIDENT_DRIVER to allow
+ * monitor mode switching.
+ */
 extern int con_mode;
 extern const struct kernel_param_ops con_mode_ops;
+#ifdef FEATURE_WLAN_RESIDENT_DRIVER
 extern int con_mode_ftm;
 extern const struct kernel_param_ops con_mode_ftm_ops;
 #endif
