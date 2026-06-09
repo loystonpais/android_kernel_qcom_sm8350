@@ -1,3 +1,7 @@
+[submodule "KernelSU-Next"]
+	path = KernelSU-Next
+	url = https://github.com/KernelSU-Next/KernelSU-Next
+	branch = legacy
 [submodule "AnyKernel3"]
 	path = AnyKernel3
 	url = https://github.com/loystonpais/AnyKernel3
